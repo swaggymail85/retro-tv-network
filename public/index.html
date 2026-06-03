@@ -26,10 +26,11 @@
     <h2>Broadcast Your Own Channel</h2>
     <input type="text" id="roomName" placeholder="Station Name (e.g., Toonami Retro)"><br>
     <input type="text" id="videoUrl" placeholder="Paste single YouTube link OR whole Playlist URL"><br>
-    <button onclick="createStation()">Launch Station</button>
+    <button onclick="handleCreation()">Launch Station</button>
   </div>
 
   <script>
+    // Fetch and display active rooms
     fetch('/api/rooms')
       .then(res => res.json())
       .then(rooms => {
@@ -39,33 +40,67 @@
         rooms.forEach(room => {
           div.innerHTML += `
             <div class="station-item">
-              <span>📡 <strong>${room.name}</strong> (${room.tracksCount} videos loaded)</span>
+              <span>📡 <strong>${room.name}</strong> (${room.tracksCount} videos)</span>
               <a href="/room.html?id=${room.id}">TUNE IN ➔</a>
             </div>`;
         });
       });
 
-    function createStation() {
-      const name = document.getElementById('roomName').value;
-      const urlInput = document.getElementById('videoUrl').value;
+    // Helper to pull IDs right inside the client browser to dodge VPS IP blocks
+    async function extractPlaylistIds(playlistId) {
+      try {
+        const response = await fetch(`https://www.youtube.com/embed/videoseries?list=${playlistId}`);
+        const text = await response.text();
+        const regex = /\"videoId\":\"([a-zA-Z0-9_-]{11})\"/g;
+        const ids = new Set();
+        let match;
+        while ((match = regex.exec(text)) !== null) {
+          ids.add(match[1]);
+        }
+        return Array.from(ids);
+      } catch (e) {
+        console.error(e);
+        return [];
+      }
+    }
+
+    async function handleCreation() {
+      const name = document.getElementById('roomName').value.trim();
+      const urlInput = document.getElementById('videoUrl').value.trim();
 
       if(!name || !urlInput) {
         alert("Please fill out both fields!");
         return;
       }
 
+      let playlist = [];
+
+      if (urlInput.includes('list=')) {
+        const playlistId = urlInput.split('list=')[1].split('&')[0];
+        document.getElementById('stations').innerText = "Extracting video sync targets via browser... Please wait.";
+        playlist = await extractPlaylistIds(playlistId);
+      } else {
+        const regExp = /^.*(?:(?:youtu\.be\/|v\/|vi\/|u\/\w\/|embed\/|shorts\/)|(?:(?:watch)?\?v(?:i)?=|\&v(?:i)?=))([^#\&\?]*).*/;
+        const match = urlInput.match(regExp);
+        const videoId = (match && match[1].length === 11) ? match[1] : urlInput;
+        if (videoId.length === 11) playlist.push(videoId);
+      }
+
+      if (playlist.length === 0) {
+        alert("Could not extract any valid YouTube IDs. Verify the playlist is Public!");
+        location.reload();
+        return;
+      }
+
+      // Send the clean array directly to the server database
       fetch('/api/rooms', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, urlInput })
+        body: JSON.stringify({ name, playlist })
       })
       .then(res => res.json())
       .then(data => {
-        if(data.success) {
-          window.location.href = `/room.html?id=${data.roomId}`;
-        } else {
-          alert("Error: " + data.error);
-        }
+        if(data.success) window.location.href = `/room.html?id=${data.roomId}`;
       });
     }
   </script>

@@ -1,7 +1,7 @@
 const express = require('express');
 const app = express();
 const path = require('path');
-const https = require('https'); // Used to safely fetch playlist pages from Google
+const https = require('https');
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
@@ -55,7 +55,7 @@ app.get('/api/rooms/:id', (req, res) => {
   });
 });
 
-// Route: Fast Action endpoint to let users tell the server the video changed
+// Route: Let users trigger the next channel track manually
 app.post('/api/rooms/:id/next', (req, res) => {
   const room = rooms[req.params.id];
   if (!room) return res.status(404).json({ error: "Room not found" });
@@ -65,24 +65,26 @@ app.post('/api/rooms/:id/next', (req, res) => {
   res.json({ success: true });
 });
 
-// Helper function: Scrapes a public YouTube playlist page to extract all 11-char video IDs safely
+// Helper function: Fetches the embedded endpoint to pull all 11-char video IDs cleanly
 function extractIdsFromPlaylist(playlistId) {
   return new Promise((resolve) => {
-    const url = `https://www.youtube.com/playlist?list=${playlistId}`;
-    https.get(url, { headers: { 'User-Agent': 'Mozilla/5.0' } }, (res) => {
+    // We target the embed version of the playlist which contains raw layout lists
+    const url = `https://www.youtube.com/embed/videoseries?list=${playlistId}`;
+    
+    https.get(url, { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' } }, (res) => {
       let data = '';
       res.on('data', chunk => data += chunk);
       res.on('end', () => {
-        // Regex looks for occurrences of "/watch?v=XXXXXXXXXXX" in the page source data
+        // This regex scans the backend configuration block YouTube transmits for embeds
         const regex = /\"videoId\":\"([a-zA-Z0-9_-]{11})\"/g;
-        const ids = [];
+        const ids = new Set(); // Using a Set just like your console script to prevent duplicates!
         let match;
+        
         while ((match = regex.exec(data)) !== null) {
-          if (!ids.includes(match[1])) {
-            ids.push(match[1]);
-          }
+          ids.add(match[1]);
         }
-        resolve(ids);
+        
+        resolve(Array.from(ids));
       });
     }).on('error', () => resolve([]));
   });
@@ -95,9 +97,10 @@ app.post('/api/rooms', async (req, res) => {
 
   let playlist = [];
   
-  // Check if it's a playlist URL
+  // Extract playlist ID if link contains 'list='
   if (urlInput.includes('list=')) {
-    const playlistId = urlInput.split('list=')[1].split('&')[0];
+    const urlParams = urlInput.split('list=')[1];
+    const playlistId = urlParams.split('&')[0];
     playlist = await extractIdsFromPlaylist(playlistId);
   } else {
     // Treat as a single video link
@@ -108,7 +111,7 @@ app.post('/api/rooms', async (req, res) => {
   }
 
   if (playlist.length === 0) {
-    return res.status(400).json({ error: "Could not extract any valid YouTube IDs from your input link." });
+    return res.status(400).json({ error: "Could not find any videos. Make sure the playlist is set to Public or Unlisted!" });
   }
 
   const id = name.toLowerCase().replace(/[^a-z0-9]/g, '-');
@@ -117,7 +120,7 @@ app.post('/api/rooms', async (req, res) => {
     playlist: playlist,
     currentVideoIndex: 0,
     videoStartTime: Date.now(),
-    videoDuration: 300 // Standard fallback window
+    videoDuration: 300 // Standard fallback window before skipping
   };
 
   res.json({ success: true, roomId: id });

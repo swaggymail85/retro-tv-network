@@ -29,9 +29,6 @@
     .btn-power { background: none; border: none; font-size: 14px; cursor: pointer; }
     .btn-input { background: #3a3d42; border: 1px solid #555; color: #bbb; font-size: 8px; font-weight: bold; padding: 3px 6px; border-radius: 4px; cursor: pointer; box-shadow: 0 2px 0 #111; }
     .btn-ch { background: #222; border: 1px solid #444; color: #00ff00; font-size: 9px; font-weight: bold; padding: 6px 0; border-radius: 4px; cursor: pointer; width: 90%; box-shadow: 0 2px 0 #000; }
-    .desk-items-container { position: absolute; left: 10px; bottom: 30px; display: flex; gap: 20px; opacity: 0.15; pointer-events: none;}
-    .ipod-classic { width: 40px; height: 70px; background: #fff; border-radius: 4px; }
-    .soda-can { width: 30px; height: 50px; background: green; border-radius: 4px; }
     
     #station-title { color: #8a919e; font-weight: bold; margin-bottom: 10px; letter-spacing: 1px;}
     .back-btn { margin-top: 20px; color: #555; text-decoration: none; font-size: 12px; font-weight: bold; }
@@ -64,14 +61,9 @@
       <div class="remote-brand">SONY</div>
       <div class="remote-buttons">
         <button class="btn-power">🔴</button>
-        <button class="btn-input" id="remote-input">INPUT</button>
+        <button class="btn-input">INPUT</button>
         <button class="btn-ch" id="remote-ch">CH +</button>
       </div>
-    </div>
-
-    <div class="desk-items-container">
-      <div class="ipod-classic"></div>
-      <div class="soda-can">DEW</div>
     </div>
   </div>
 
@@ -93,26 +85,31 @@
         .then(roomData => {
           document.getElementById('station-title').innerText = `📡 NOW BROADCASTING: ${roomData.name.toUpperCase()}`;
           
-player = new YT.Player('player', {
-  videoId: roomData.videoId,
-  playerVars: {
-    'autoplay': 1,
-    'mute': 1, // 👈 CRUCIAL ADDITION FOR 2026 WEB BROWSERS
-    'modestbranding': 1,
-    'rel': 0,
-    'controls': 1,
-    'startSeconds': roomData.seekTo,
-    'origin': window.location.origin // 👈 THIS FIXES THE VPS DOMAIN BLOCK
-  }
-});
+          player = new YT.Player('player', {
+            videoId: roomData.videoId,
+            playerVars: {
+              'autoplay': 1,
+              'mute': 1,
+              'modestbranding': 1,
+              'rel': 0,
+              'controls': 1,
+              'startSeconds': roomData.seekTo,
+              'origin': window.location.origin
+            }
+          });
         })
         .catch(err => {
           document.getElementById('station-title').innerText = "❌ STATIC DETECTED - SIGNAL NOT FOUND";
         });
     }
 
-    document.getElementById('shuffle-btn').addEventListener('click', () => location.reload());
-    document.getElementById('remote-ch').addEventListener('click', () => location.reload());
+    function changeChannelTrack() {
+      fetch(`/api/rooms/${roomId}/next`, { method: 'POST' })
+        .then(() => location.reload());
+    }
+
+    document.getElementById('shuffle-btn').addEventListener('click', changeChannelTrack);
+    document.getElementById('remote-ch').addEventListener('click', changeChannelTrack);
   </script>
 </body>
 </html>

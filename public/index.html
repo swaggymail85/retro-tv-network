@@ -1,1 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Retro TV Network - Lobby</title>
+  <style>
+    body { background: #0c0c0e; color: #fff; font-family: sans-serif; padding: 50px; text-align: center; }
+    .container { max-width: 600px; margin: 0 auto; }
+    .station-list { background: #1a1b1e; padding: 20px; border-radius: 10px; margin-bottom: 30px; text-align: left; }
+    .station-item { display: flex; justify-content: space-between; padding: 10px; border-bottom: 1px solid #333; align-items: center; }
+    a { color: #00ff00; text-decoration: none; font-weight: bold; }
+    input, button { padding: 10px; margin: 5px; border-radius: 5px; border: none; font-size: 14px; }
+    input { width: 70%; background: #222; color: #fff; border: 1px solid #444; }
+    button { background: #4a4d53; color: white; cursor: pointer; font-weight: bold; }
+    button:hover { background: #60646c; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>📺 Retro TV Station Network</h1>
+    <p>Tune into a community broadcast or establish your own station.</p>
+    
+    <h2>Active Channels</h2>
+    <div class="station-list" id="stations">Loading live signals...</div>
 
+    <h2>Broadcast Your Own Channel</h2>
+    <input type="text" id="roomName" placeholder="Station Name (e.g., Toonami Retro)"><br>
+    <input type="text" id="videoUrl" placeholder="YouTube Video Link or ID"><br>
+    <button onclick="createStation()">Launch Station</button>
+  </div>
+
+  <script>
+    fetch('/api/rooms')
+      .then(res => res.json())
+      .then(rooms => {
+        const div = document.getElementById('stations');
+        if(rooms.length === 0) { div.innerHTML = "No stations broadcasting right now."; return; }
+        div.innerHTML = '';
+        rooms.forEach(room => {
+          div.innerHTML += `
+            <div class="station-item">
+              <span>📡 <strong>${room.name}</strong></span>
+              <a href="/room.html?id=${room.id}">TUNE IN ➔</a>
+            </div>`;
+        });
+      });
+
+    function extractVideoId(input) {
+      const clean = input.trim();
+      if (clean.length === 11 && !clean.includes('/') && !clean.includes('=')) return clean;
+      const regExp = /^.*(?:(?:youtu\.be\/|v\/|vi\/|u\/\w\/|embed\/|shorts\/)|(?:(?:watch)?\?v(?:i)?=|\&v(?:i)?=))([^#\&\?]*).*/;
+      const match = clean.match(regExp);
+      return (match && match[1].length === 11) ? match[1] : null;
+    }
+
+    function createStation() {
+      const name = document.getElementById('roomName').value;
+      const rawVideo = document.getElementById('videoUrl').value;
+      const videoId = extractVideoId(rawVideo);
+
+      if(!name || !videoId) {
+        alert("Please enter a valid station name and a valid YouTube link/ID!");
+        return;
+      }
+
+      fetch('/api/rooms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, firstVideo: videoId })
+      })
+      .then(res => res.json())
+      .then(data => {
+        if(data.success) window.location.href = `/room.html?id=${data.roomId}`;
+      });
+    }
+  </script>
+</body>
+</html>

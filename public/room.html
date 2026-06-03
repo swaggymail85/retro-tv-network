@@ -93,16 +93,18 @@
         .then(roomData => {
           document.getElementById('station-title').innerText = `📡 NOW BROADCASTING: ${roomData.name.toUpperCase()}`;
           
-          player = new YT.Player('player', {
-            videoId: roomData.videoId,
-            playerVars: {
-              'autoplay': 1,
-              'modestbranding': 1,
-              'rel': 0,
-              'controls': 1,
-              'startSeconds': roomData.seekTo
-            }
-          });
+player = new YT.Player('player', {
+  videoId: roomData.videoId,
+  playerVars: {
+    'autoplay': 1,
+    'mute': 1, // 👈 CRUCIAL ADDITION FOR 2026 WEB BROWSERS
+    'modestbranding': 1,
+    'rel': 0,
+    'controls': 1,
+    'startSeconds': roomData.seekTo,
+    'origin': window.location.origin // 👈 THIS FIXES THE VPS DOMAIN BLOCK
+  }
+});
         })
         .catch(err => {
           document.getElementById('station-title').innerText = "❌ STATIC DETECTED - SIGNAL NOT FOUND";
